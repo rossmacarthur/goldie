@@ -1,3 +1,5 @@
+mod tests;
+
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -32,7 +34,7 @@ impl Goldie {
         let module = source_path.file_stem().unwrap();
         let golden_path = {
             let mut p = source_path.parent().unwrap().join("testdata");
-            if module != "lib" && module != "mod" {
+            if module != "lib" && module != "mod" && module != "tests" {
                 p = p.join(module)
             }
             p.join(function_name).with_extension("golden")
@@ -163,38 +165,4 @@ macro_rules! item_path {
         let name = type_name_of(f);
         &name[..name.len() - 3]
     }};
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use serde::Serialize;
-
-    #[test]
-    fn goldie_golden_path() {
-        let g = Goldie::new(
-            Path::new("/full/path/to/source.rs"),
-            "crate::mod::tests::function_name",
-        );
-        assert_eq!(
-            g.golden_path,
-            Path::new("/full/path/to/testdata/source/function_name.golden"),
-        );
-    }
-
-    #[test]
-    fn goldie_assert() {
-        crate::assert!("testing...\n");
-    }
-
-    #[test]
-    fn goldie_assert_template() {
-        #[derive(Serialize)]
-        struct Context {
-            test: &'static str,
-        }
-        let ctx = Context { test: "testing..." };
-        crate::assert_template!(&ctx, "Such testing...\n");
-    }
 }
