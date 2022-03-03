@@ -22,14 +22,13 @@ In your test function assert the contents using `goldie::assert!`. The golden
 filename will be automatically determined based on the test file and test
 function name. Run tests with `GOLDIE_UPDATE=true` to automatically update
 golden files.
-```rust
-// file: module.rs
 
+```rust
 #[test]
 fn example() {
     let text = { /* ... run the test ... */ }
 
-    // assert that the contents of ./testdata/module/example.golden
+    // assert that the contents of ./testdata/example.golden
     // are equal to `text`
     goldie::assert!(text)
 }
@@ -41,18 +40,16 @@ order to render the template. Values are rendered using
 [TinyTemplate](https://github.com/bheisler/TinyTemplate) e.g. `{value.field}`.
 You cannot use  `GOLDIE_UPDATE=true` to automatically update templated golden
 files.
-```rust
-// file: module.rs
 
+```rust
 use serde_json::json;
 
 #[test]
 fn example() {
     let text = { /* ... run the test ... */ }
 
-    // first render the golden file ./testdata/module/example.golden
-    // with the provided `ctx` then assert that the contents are
-    // equal to the result.
+    // assert that the contents of ./testdata/example.golden
+    // are equal to `text` after rendering with `ctx`.
     let ctx = json!({"value": "Hello World!"});
     goldie::assert_template!(&ctx, text)
 }

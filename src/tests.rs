@@ -1,19 +1,36 @@
-#![cfg(test)]
-
 use super::*;
 
 use serde::Serialize;
 
 #[test]
-fn goldie_golden_path() {
-    let g = Goldie::new(
-        Path::new("/full/path/to/source.rs"),
-        "crate::mod::tests::function_name",
-    );
-    assert_eq!(
-        g.golden_path,
-        Path::new("/full/path/to/testdata/source/function_name.golden"),
-    );
+fn goldie_golden_file() {
+    let tests = [
+        (
+            ("/repo/src/lib.rs", "crate::tests::func"),
+            "/repo/src/testdata/func.golden",
+        ),
+        (
+            ("/repo/src/foo.rs", "crate::foo::tests::func"),
+            "/repo/src/testdata/func.golden",
+        ),
+        (
+            ("/repo/src/foo/mod.rs", "crate::foo::tests::func"),
+            "/repo/src/foo/testdata/func.golden",
+        ),
+        (
+            ("/repo/src/foo/bar.rs", "crate::foo::bar::tests::func"),
+            "/repo/src/foo/testdata/func.golden",
+        ),
+        (
+            ("/repo/src/bin/foo.rs", "crate::tests::func"),
+            "/repo/src/bin/testdata/func.golden",
+        ),
+    ];
+
+    for ((file, path), exp) in tests {
+        let g = Goldie::new(file, path);
+        assert_eq!(g.golden_file, Path::new(exp))
+    }
 }
 
 #[test]
