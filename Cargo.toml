@@ -11,11 +11,11 @@ keywords = ["golden", "file", "testing", "tool"]
 categories = ["development-tools::testing"]
 
 [dependencies]
-anyhow = "1.0"
-pretty_assertions = "1.0"
-serde = "1.0"
+anyhow = "1.0.55"
+pretty_assertions = "1.1.0"
+serde = "1.0.136"
 serde_json = "1.0.79"
-tinytemplate = "1.2"
+tinytemplate = "1.2.1"
 
 [dev-dependencies]
-serde = { version = "1.0.130", features = ["derive"] }
+serde = { version = "1.0.136", features = ["derive"] }
