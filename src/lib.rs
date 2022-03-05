@@ -51,21 +51,21 @@ impl Goldie {
     }
 
     #[track_caller]
-    pub fn assert(&self, expected: impl AsRef<str>) -> Result<()> {
+    pub fn assert(&self, actual: impl AsRef<str>) -> Result<()> {
         if self.update {
             let dir = self.golden_file.parent().unwrap();
             fs::create_dir_all(dir)?;
-            fs::write(&self.golden_file, expected.as_ref())?;
+            fs::write(&self.golden_file, actual.as_ref())?;
         } else {
-            let actual = fs::read_to_string(&self.golden_file).with_context(|| {
+            let expected = fs::read_to_string(&self.golden_file).with_context(|| {
                 format!(
                     "failed to read golden file `{}`",
                     self.golden_file.display()
                 )
             })?;
             pretty_assertions::assert_eq!(
-                actual,
-                expected.as_ref(),
+                actual.as_ref(),
+                expected,
                 "golden file `{}` does not match",
                 self.golden_file
                     .strip_prefix(env::current_dir()?)?
@@ -76,7 +76,7 @@ impl Goldie {
     }
 
     #[track_caller]
-    pub fn assert_template(&self, ctx: impl Serialize, expected: impl AsRef<str>) -> Result<()> {
+    pub fn assert_template(&self, ctx: impl Serialize, actual: impl AsRef<str>) -> Result<()> {
         let mut tt = TinyTemplate::new();
         tt.set_default_formatter(&tinytemplate::format_unescaped);
 
@@ -92,7 +92,7 @@ impl Goldie {
                 self.golden_file.display()
             )
         })?;
-        let actual = tt.render("golden", &ctx).with_context(|| {
+        let expected = tt.render("golden", &ctx).with_context(|| {
             format!(
                 "failed to render golden file template `{}`",
                 self.golden_file.display()
@@ -100,8 +100,8 @@ impl Goldie {
         })?;
 
         pretty_assertions::assert_eq!(
-            actual,
-            expected.as_ref(),
+            actual.as_ref(),
+            expected,
             "golden file `{}` does not match",
             self.golden_file
                 .strip_prefix(env::current_dir()?)?
@@ -110,23 +110,70 @@ impl Goldie {
 
         Ok(())
     }
+
+    #[track_caller]
+    pub fn assert_json(&self, actual: impl Serialize) -> Result<()> {
+        if self.update {
+            let dir = self.golden_file.parent().unwrap();
+            fs::create_dir_all(dir)?;
+            fs::write(
+                &self.golden_file,
+                serde_json::to_string_pretty(&actual).unwrap(),
+            )?;
+        } else {
+            let contents = fs::read_to_string(&self.golden_file).with_context(|| {
+                format!(
+                    "failed to read golden file `{}`",
+                    self.golden_file.display()
+                )
+            })?;
+            let expected: serde_json::Value =
+                serde_json::from_str(&contents).with_context(|| {
+                    format!(
+                        "golden file `{}` contains bad JSON",
+                        self.golden_file.display()
+                    )
+                })?;
+            let actual: serde_json::Value = serde_json::to_value(&actual)?;
+
+            pretty_assertions::assert_eq!(
+                actual,
+                expected,
+                "golden file `{}` does not match",
+                self.golden_file
+                    .strip_prefix(env::current_dir()?)?
+                    .display(),
+            );
+        }
+
+        Ok(())
+    }
 }
 
 /// Assert the golden file matches.
 #[macro_export]
 macro_rules! assert {
-    ($expected:expr) => {{
+    ($actual:expr) => {{
         let g = $crate::_new_goldie!();
-        g.assert($expected).unwrap();
+        g.assert($actual).unwrap();
     }};
 }
 
 /// Assert the templated golden file matches.
 #[macro_export]
 macro_rules! assert_template {
-    ($ctx:expr, $expected:expr) => {{
+    ($ctx:expr, $actual:expr) => {{
         let g = $crate::_new_goldie!();
-        g.assert_template($ctx, $expected).unwrap();
+        g.assert_template($ctx, $actual).unwrap();
+    }};
+}
+
+/// Assert the JSON golden file matches.
+#[macro_export]
+macro_rules! assert_json {
+    ($actual:expr) => {{
+        let g = $crate::_new_goldie!();
+        g.assert_json($actual).unwrap();
     }};
 }
 
