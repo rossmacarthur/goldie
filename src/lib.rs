@@ -20,7 +20,9 @@ use tinytemplate::TinyTemplate;
 macro_rules! assert {
     ($actual:expr) => {{
         let g = $crate::_new_goldie!();
-        g.assert($actual).unwrap();
+        if let Err(err) = g.assert($actual) {
+            ::std::panic!("{}", err);
+        }
     }};
 }
 
@@ -29,7 +31,9 @@ macro_rules! assert {
 macro_rules! assert_debug {
     ($actual:expr) => {{
         let g = $crate::_new_goldie!();
-        g.assert_debug($actual).unwrap();
+        if let Err(err) = g.assert_debug($actual) {
+            ::std::panic!("{}", err);
+        }
     }};
 }
 
@@ -38,7 +42,9 @@ macro_rules! assert_debug {
 macro_rules! assert_template {
     ($ctx:expr, $actual:expr) => {{
         let g = $crate::_new_goldie!();
-        g.assert_template($ctx, $actual).unwrap();
+        if let Err(err) = g.assert_template($ctx, $actual) {
+            ::std::panic!("{}", err);
+        }
     }};
 }
 
@@ -47,7 +53,9 @@ macro_rules! assert_template {
 macro_rules! assert_json {
     ($actual:expr) => {{
         let g = $crate::_new_goldie!();
-        g.assert_json($actual).unwrap();
+        if let Err(err) = g.assert_json($actual) {
+            ::std::panic!("{}", err);
+        }
     }};
 }
 
@@ -133,16 +141,12 @@ impl Goldie {
             fs::create_dir_all(dir)?;
             fs::write(&self.golden_file, actual.as_ref())?;
         } else {
-            let expected = fs::read_to_string(&self.golden_file).with_context(|| {
-                format!(
-                    "failed to read golden file `{}`",
-                    self.golden_file.display()
-                )
-            })?;
+            let expected = fs::read_to_string(&self.golden_file)
+                .with_context(|| self.error("failed to read golden file"))?;
             pretty_assertions::assert_eq!(
                 actual.as_ref(),
                 expected,
-                "golden file `{}` does not match",
+                "\n\ngolden file `{}` does not match",
                 self.golden_file
                     .strip_prefix(env::current_dir()?)?
                     .display(),
@@ -161,29 +165,18 @@ impl Goldie {
         let mut tt = TinyTemplate::new();
         tt.set_default_formatter(&tinytemplate::format_unescaped);
 
-        let contents = fs::read_to_string(&self.golden_file).with_context(|| {
-            format!(
-                "failed to read golden file `{}`",
-                self.golden_file.display()
-            )
-        })?;
-        tt.add_template("golden", &contents).with_context(|| {
-            format!(
-                "failed to compile golden file template `{}`",
-                self.golden_file.display()
-            )
-        })?;
-        let expected = tt.render("golden", &ctx).with_context(|| {
-            format!(
-                "failed to render golden file template `{}`",
-                self.golden_file.display()
-            )
-        })?;
+        let contents = fs::read_to_string(&self.golden_file)
+            .with_context(|| self.error("failed to read golden file"))?;
+        tt.add_template("golden", &contents)
+            .with_context(|| self.error("failed to compile golden file template"))?;
+        let expected = tt
+            .render("golden", &ctx)
+            .with_context(|| self.error("failed to render golden file template"))?;
 
         pretty_assertions::assert_eq!(
             actual.as_ref(),
             expected,
-            "golden file `{}` does not match",
+            "\n\ngolden file `{}` does not match",
             self.golden_file
                 .strip_prefix(env::current_dir()?)?
                 .display(),
@@ -202,25 +195,16 @@ impl Goldie {
                 serde_json::to_string_pretty(&actual).unwrap(),
             )?;
         } else {
-            let contents = fs::read_to_string(&self.golden_file).with_context(|| {
-                format!(
-                    "failed to read golden file `{}`",
-                    self.golden_file.display()
-                )
-            })?;
+            let contents = fs::read_to_string(&self.golden_file)
+                .with_context(|| self.error("failed to read golden file"))?;
             let expected: serde_json::Value =
-                serde_json::from_str(&contents).with_context(|| {
-                    format!(
-                        "golden file `{}` contains bad JSON",
-                        self.golden_file.display()
-                    )
-                })?;
+                serde_json::from_str(&contents).with_context(|| self.error("bad JSON"))?;
             let actual: serde_json::Value = serde_json::to_value(&actual)?;
 
             pretty_assertions::assert_eq!(
                 actual,
                 expected,
-                "golden file `{}` does not match",
+                "\n\ngolden file `{}` does not match",
                 self.golden_file
                     .strip_prefix(env::current_dir()?)?
                     .display(),
@@ -228,6 +212,16 @@ impl Goldie {
         }
 
         Ok(())
+    }
+
+    fn error(&self, msg: &str) -> String {
+        use ansi_term::Color;
+        format!(
+            "\n\n{}: {}\nrun with {} to regenerate the golden file\n\n",
+            Color::Red.paint(msg),
+            self.golden_file.display(),
+            Color::Blue.bold().paint("GOLDIE_UPDATE=1"),
+        )
     }
 }
 
