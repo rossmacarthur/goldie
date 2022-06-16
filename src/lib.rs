@@ -25,10 +25,10 @@ impl Goldie {
     /// - `function_path` is the full path to the function. e.g.
     ///   `crate::module::tests::function_name`.
     pub fn new(source_file: impl AsRef<Path>, function_path: impl AsRef<str>) -> Self {
-        Self::_new(source_file.as_ref(), function_path.as_ref())
+        Self::new_impl(source_file.as_ref(), function_path.as_ref())
     }
 
-    fn _new(source_file: &Path, function_path: &str) -> Self {
+    fn new_impl(source_file: &Path, function_path: &str) -> Self {
         let (_, name) = function_path.rsplit_once("::").unwrap();
 
         let golden_file = {
@@ -73,6 +73,11 @@ impl Goldie {
             );
         }
         Ok(())
+    }
+
+    #[track_caller]
+    pub fn assert_debug(&self, actual: impl std::fmt::Debug) -> Result<()> {
+        self.assert(format!("{:#?}", actual))
     }
 
     #[track_caller]
@@ -156,6 +161,15 @@ macro_rules! assert {
     ($actual:expr) => {{
         let g = $crate::_new_goldie!();
         g.assert($actual).unwrap();
+    }};
+}
+
+/// Assert the golden file matches the debug output.
+#[macro_export]
+macro_rules! assert_debug {
+    ($actual:expr) => {{
+        let g = $crate::_new_goldie!();
+        g.assert_debug($actual).unwrap();
     }};
 }
 

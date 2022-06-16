@@ -39,6 +39,23 @@ fn goldie_assert() {
 }
 
 #[test]
+fn goldie_assert_debug() {
+    #[allow(dead_code)]
+    #[derive(Debug)]
+    struct User {
+        name: &'static str,
+        surname: &'static str,
+    }
+
+    let u = User {
+        name: "Steve",
+        surname: "Harrington",
+    };
+
+    crate::assert_debug!(&u);
+}
+
+#[test]
 fn goldie_assert_template() {
     #[derive(Serialize)]
     struct Context {
@@ -46,4 +63,20 @@ fn goldie_assert_template() {
     }
     let ctx = Context { test: "testing..." };
     crate::assert_template!(&ctx, "Such testing...\n");
+}
+
+#[test]
+fn goldie_assert_json() {
+    #[derive(Serialize)]
+    struct User {
+        name: &'static str,
+        surname: &'static str,
+    }
+
+    let u = User {
+        name: "Steve",
+        surname: "Harrington",
+    };
+
+    crate::assert_json!(&u);
 }
