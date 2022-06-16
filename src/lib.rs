@@ -1,13 +1,89 @@
 #[cfg(test)]
 mod tests;
 
+use std::collections::BTreeMap;
 use std::env;
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process;
+use std::sync::Arc;
+use std::sync::Mutex;
 
 use anyhow::{Context, Result};
-use serde::Serialize;
+use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
 use tinytemplate::TinyTemplate;
+
+/// Assert the golden file matches.
+#[macro_export]
+macro_rules! assert {
+    ($actual:expr) => {{
+        let g = $crate::_new_goldie!();
+        g.assert($actual).unwrap();
+    }};
+}
+
+/// Assert the golden file matches the debug output.
+#[macro_export]
+macro_rules! assert_debug {
+    ($actual:expr) => {{
+        let g = $crate::_new_goldie!();
+        g.assert_debug($actual).unwrap();
+    }};
+}
+
+/// Assert the templated golden file matches.
+#[macro_export]
+macro_rules! assert_template {
+    ($ctx:expr, $actual:expr) => {{
+        let g = $crate::_new_goldie!();
+        g.assert_template($ctx, $actual).unwrap();
+    }};
+}
+
+/// Assert the JSON golden file matches.
+#[macro_export]
+macro_rules! assert_json {
+    ($actual:expr) => {{
+        let g = $crate::_new_goldie!();
+        g.assert_json($actual).unwrap();
+    }};
+}
+
+/// Constructs a new goldie instance.
+///
+/// Not public API.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! _new_goldie {
+    () => {{
+        let source_file = $crate::cargo_workspace_dir(env!("CARGO_MANIFEST_DIR")).join(file!());
+        let function_path = $crate::_function_path!();
+        $crate::Goldie::new(source_file, function_path)
+    }};
+}
+
+/// Returns the fully qualified path to the current item.
+///
+/// Goldie uses this to get the name of the test function.
+///
+/// Not public API.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! _function_path {
+    () => {{
+        fn f() {}
+        fn type_name_of_val<T>(_: T) -> &'static str {
+            ::std::any::type_name::<T>()
+        }
+        let mut name = type_name_of_val(f).strip_suffix("::f").unwrap_or("");
+        while let Some(rest) = name.strip_suffix("::{{closure}}") {
+            name = rest;
+        }
+        name
+    }};
+}
 
 #[derive(Debug)]
 pub struct Goldie {
@@ -155,70 +231,41 @@ impl Goldie {
     }
 }
 
-/// Assert the golden file matches.
-#[macro_export]
-macro_rules! assert {
-    ($actual:expr) => {{
-        let g = $crate::_new_goldie!();
-        g.assert($actual).unwrap();
-    }};
-}
-
-/// Assert the golden file matches the debug output.
-#[macro_export]
-macro_rules! assert_debug {
-    ($actual:expr) => {{
-        let g = $crate::_new_goldie!();
-        g.assert_debug($actual).unwrap();
-    }};
-}
-
-/// Assert the templated golden file matches.
-#[macro_export]
-macro_rules! assert_template {
-    ($ctx:expr, $actual:expr) => {{
-        let g = $crate::_new_goldie!();
-        g.assert_template($ctx, $actual).unwrap();
-    }};
-}
-
-/// Assert the JSON golden file matches.
-#[macro_export]
-macro_rules! assert_json {
-    ($actual:expr) => {{
-        let g = $crate::_new_goldie!();
-        g.assert_json($actual).unwrap();
-    }};
-}
-
-/// Constructs a new goldie instance.
-#[doc(hidden)]
-#[macro_export]
-macro_rules! _new_goldie {
-    () => {{
-        use ::std::path::Path;
-        use ::std::{concat, env, file};
-        let source_file = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/", file!()));
-        let function_path = $crate::_function_path!();
-        $crate::Goldie::new(source_file, function_path)
-    }};
-}
-
-/// Returns the fully qualified path to the current item.
+/// Returns the Cargo workspace dir for the given manifest dir.
 ///
-/// Goldie uses this to get the name of the test function.
+/// Not public API.
 #[doc(hidden)]
-#[macro_export]
-macro_rules! _function_path {
-    () => {{
-        fn f() {}
-        fn type_name_of_val<T>(_: T) -> &'static str {
-            ::std::any::type_name::<T>()
-        }
-        let mut name = type_name_of_val(f).strip_suffix("::f").unwrap_or("");
-        while let Some(rest) = name.strip_suffix("::{{closure}}") {
-            name = rest;
-        }
-        name
-    }};
+pub fn cargo_workspace_dir(manifest_dir: &str) -> PathBuf {
+    static DIRS: Lazy<Mutex<BTreeMap<String, Arc<Path>>>> =
+        Lazy::new(|| Mutex::new(BTreeMap::new()));
+
+    let mut dirs = DIRS.lock().unwrap();
+
+    if let Some(dir) = dirs.get(manifest_dir) {
+        return dir.to_path_buf();
+    }
+
+    let dir = env::var("CARGO_WORKSPACE_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            #[derive(Deserialize)]
+            struct Manifest {
+                workspace_root: PathBuf,
+            }
+            let cargo = env::var_os("CARGO");
+            let cargo = cargo.as_deref().unwrap_or_else(|| OsStr::new("cargo"));
+            let output = process::Command::new(cargo)
+                .args(&["metadata", "--format-version=1", "--no-deps"])
+                .current_dir(&manifest_dir)
+                .output()
+                .unwrap();
+            let manifest: Manifest = serde_json::from_slice(&output.stdout).unwrap();
+            manifest.workspace_root
+        });
+    dirs.insert(
+        String::from(manifest_dir),
+        dir.clone().into_boxed_path().into(),
+    );
+
+    dir
 }
