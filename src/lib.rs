@@ -13,7 +13,6 @@ use std::sync::Mutex;
 use anyhow::{Context, Result};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use tinytemplate::TinyTemplate;
 
 /// Assert the golden file matches.
 #[macro_export]
@@ -162,15 +161,16 @@ impl Goldie {
 
     #[track_caller]
     pub fn assert_template(&self, ctx: impl Serialize, actual: impl AsRef<str>) -> Result<()> {
-        let mut tt = TinyTemplate::new();
-        tt.set_default_formatter(&tinytemplate::format_unescaped);
+        static ENGINE: Lazy<upon::Engine> = Lazy::new(|| {
+            upon::Engine::with_syntax(upon::SyntaxBuilder::new().expr("{{", "}}").build())
+        });
 
         let contents = fs::read_to_string(&self.golden_file)
             .with_context(|| self.error("failed to read golden file"))?;
-        tt.add_template("golden", &contents)
-            .with_context(|| self.error("failed to compile golden file template"))?;
-        let expected = tt
-            .render("golden", &ctx)
+        let expected = ENGINE
+            .compile(&contents)
+            .with_context(|| self.error("failed to compile golden file template"))?
+            .render(&ctx)
             .with_context(|| self.error("failed to render golden file template"))?;
 
         pretty_assertions::assert_eq!(

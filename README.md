@@ -37,20 +37,18 @@ fn example() {
 Templated golden files are also supported using `goldie::assert_template!`.
 Something implementing `serde::Serialize` needs to be provided as context in
 order to render the template. Values are rendered using
-[TinyTemplate](https://github.com/bheisler/TinyTemplate) e.g. `{value.field}`.
+[upon](https://github.com/rossmacarthur/upon) e.g. `{{ value.field }}`.
 You cannot use  `GOLDIE_UPDATE=true` to automatically update templated golden
 files.
 
 ```rust
-use serde_json::json;
-
 #[test]
 fn example() {
     let text = { /* ... run the test ... */ }
 
     // assert that the contents of ./testdata/example.golden
     // are equal to `text` after rendering with `ctx`.
-    let ctx = json!({"value": "Hello World!"});
+    let ctx = upon::value!{ value: "Hello World!" };
     goldie::assert_template!(&ctx, text)
 }
 ```
