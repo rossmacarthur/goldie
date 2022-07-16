@@ -2,6 +2,7 @@
 
 [![Crates.io Version](https://img.shields.io/crates/v/goldie.svg)](https://crates.io/crates/goldie)
 [![Docs.rs Latest](https://img.shields.io/badge/docs.rs-latest-blue.svg)](https://docs.rs/goldie)
+[![Build Status](https://img.shields.io/github/workflow/status/rossmacarthur/goldie/build/trunk)](https://github.com/rossmacarthur/goldie/actions?query=workflow%3Abuild)
 
 Simple golden file testing for Rust.
 
@@ -13,9 +14,8 @@ goldie::assert!(text);
 
 Add the following to your Cargo manifest.
 
-```toml
-[dev-dependencies]
-goldie = "0.1"
+```sh
+cargo add goldie --dev
 ```
 
 In your test function assert the contents using `goldie::assert!`. The golden
