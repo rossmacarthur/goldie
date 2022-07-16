@@ -12,7 +12,7 @@ goldie::assert!(text);
 
 ## 🚀 Getting started
 
-Add the following to your Cargo manifest.
+Add `goldie` to your project as a dev dependency.
 
 ```sh
 cargo add goldie --dev
