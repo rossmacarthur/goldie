@@ -215,12 +215,12 @@ impl Goldie {
     }
 
     fn error(&self, msg: &str) -> String {
-        use ansi_term::Color;
+        use yansi::Color;
         format!(
             "\n\n{}: {}\nrun with {} to regenerate the golden file\n\n",
             Color::Red.paint(msg),
             self.golden_file.display(),
-            Color::Blue.bold().paint("GOLDIE_UPDATE=1"),
+            Color::Blue.paint("GOLDIE_UPDATE=1").bold(),
         )
     }
 }
