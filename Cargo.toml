@@ -14,10 +14,7 @@ categories = ["development-tools::testing"]
 anyhow = "1.0.55"
 once_cell = "1.12.0"
 pretty_assertions = "1.3.0"
-serde = "1.0.136"
+serde = { version = "1.0.136", features = ["derive"] }
 serde_json = "1.0.79"
 upon = "0.5.0"
 yansi = "0.5.1"
-
-[dev-dependencies]
-serde = { version = "1.0.136", features = ["derive"] }
