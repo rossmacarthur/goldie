@@ -205,7 +205,7 @@ impl Goldie {
 
     #[track_caller]
     pub fn assert_debug(&self, actual: impl std::fmt::Debug) -> Result<()> {
-        self.assert(format!("{:#?}", actual))
+        self.assert(format!("{actual:#?}"))
     }
 
     #[track_caller]
