@@ -4,7 +4,7 @@
 //! goldie::assert!(text);
 //! ```
 //!
-//! ## 🚀 Getting started
+//! # 🚀 Getting started
 //!
 //! Add `goldie` to your project as a dev dependency.
 //!
