@@ -4,90 +4,90 @@ use std::path::Path;
 use anyhow::Context as _;
 use serde::Serialize;
 
-use crate::Builder;
+use goldie::Builder;
 
 #[test]
 fn goldie_golden_file() {
     let manifest_dir = "/repo";
     let tests = [
         (
-            ("src/lib.rs", "crate::tests::func"),
+            ("src/lib.rs", "goldie::tests::func"),
             "/repo/src/testdata/func.golden",
         ),
         (
-            ("src/lib.rs", "crate::tests::a::func"),
+            ("src/lib.rs", "goldie::tests::a::func"),
             "/repo/src/testdata/a/func.golden",
         ),
         (
-            ("src/tests.rs", "crate::tests::func"),
+            ("src/tests.rs", "goldie::tests::func"),
             "/repo/src/testdata/func.golden",
         ),
         (
-            ("src/tests.rs", "crate::tests::a::func"),
+            ("src/tests.rs", "goldie::tests::a::func"),
             "/repo/src/testdata/a/func.golden",
         ),
         (
-            ("src/a.rs", "crate::a::tests::func"),
+            ("src/a.rs", "goldie::a::tests::func"),
             "/repo/src/a/testdata/func.golden",
         ),
         (
-            ("src/a.rs", "crate::a::tests::b::func"),
+            ("src/a.rs", "goldie::a::tests::b::func"),
             "/repo/src/a/testdata/b/func.golden",
         ),
         (
-            ("src/a/tests.rs", "crate::a::tests::func"),
+            ("src/a/tests.rs", "goldie::a::tests::func"),
             "/repo/src/a/testdata/func.golden",
         ),
         (
-            ("src/a/tests.rs", "crate::a::tests::b::func"),
+            ("src/a/tests.rs", "goldie::a::tests::b::func"),
             "/repo/src/a/testdata/b/func.golden",
         ),
         (
-            ("src/a/mod.rs", "crate::a::tests::func"),
+            ("src/a/mod.rs", "goldie::a::tests::func"),
             "/repo/src/a/testdata/func.golden",
         ),
         (
-            ("src/a/mod.rs", "crate::a::tests::b::func"),
+            ("src/a/mod.rs", "goldie::a::tests::b::func"),
             "/repo/src/a/testdata/b/func.golden",
         ),
         (
-            ("src/a/tests.rs", "crate::a::tests::func"),
+            ("src/a/tests.rs", "goldie::a::tests::func"),
             "/repo/src/a/testdata/func.golden",
         ),
         (
-            ("src/a/tests.rs", "crate::a::tests::b::func"),
+            ("src/a/tests.rs", "goldie::a::tests::b::func"),
             "/repo/src/a/testdata/b/func.golden",
         ),
         (
-            ("src/a/b/tests.rs", "crate::a::b::tests::func"),
+            ("src/a/b/tests.rs", "goldie::a::b::tests::func"),
             "/repo/src/a/b/testdata/func.golden",
         ),
         (
-            ("src/a/b/tests.rs", "crate::a::b::tests::c::func"),
+            ("src/a/b/tests.rs", "goldie::a::b::tests::c::func"),
             "/repo/src/a/b/testdata/c/func.golden",
         ),
         (
-            ("src/bin/a.rs", "crate::tests::func"),
+            ("src/bin/a.rs", "goldie::tests::func"),
             "/repo/src/bin/a/testdata/func.golden",
         ),
         (
-            ("src/bin/a.rs", "crate::tests::b::func"),
+            ("src/bin/a.rs", "goldie::tests::b::func"),
             "/repo/src/bin/a/testdata/b/func.golden",
         ),
         (
-            ("tests/a.rs", "crate::func"),
+            ("tests/a.rs", "goldie::func"),
             "/repo/tests/a/testdata/func.golden",
         ),
         (
-            ("tests/a.rs", "crate::b::func"),
+            ("tests/a.rs", "goldie::b::func"),
             "/repo/tests/a/testdata/b/func.golden",
         ),
         (
-            ("tests/a/b.rs", "crate::b::func"),
+            ("tests/a/b.rs", "goldie::b::func"),
             "/repo/tests/a/b/testdata/func.golden",
         ),
         (
-            ("tests/a/b.rs", "crate::b::c::func"),
+            ("tests/a/b.rs", "goldie::b::c::func"),
             "/repo/tests/a/b/testdata/c/func.golden",
         ),
     ];
@@ -103,15 +103,71 @@ fn goldie_golden_file() {
 }
 
 #[test]
+fn goldie_new_name() {
+    goldie::new!()
+        .name("not_new_name.golden")
+        .build()
+        .assert("testing...\n");
+}
+
+#[test]
+fn goldie_new_name_prefix() {
+    goldie::new!()
+        .name_prefix("custom-")
+        .build()
+        .assert("testing...\n");
+}
+
+#[test]
+fn goldie_new_name_prefix_dir() {
+    goldie::new!()
+        .name_prefix("custom/")
+        .build()
+        .assert("testing...\n");
+}
+
+#[test]
+fn goldie_new_name_suffix() {
+    goldie::new!()
+        .name_suffix("-custom")
+        .build()
+        .assert("testing...\n");
+}
+
+#[test]
+fn goldie_new_name_suffix_dir() {
+    goldie::new!()
+        .name_suffix("/custom")
+        .build()
+        .assert("testing...\n");
+}
+
+#[test]
+fn goldie_new_golden_dir() {
+    goldie::new!()
+        .golden_dir(Path::new(file!()).parent().unwrap().join("mytestdata"))
+        .build()
+        .assert("testing...\n");
+}
+
+#[test]
+fn goldie_new_extension() {
+    goldie::new!()
+        .extension("txt")
+        .build()
+        .assert("testing...\n");
+}
+
+#[test]
 fn goldie_assert() {
-    crate::assert!("testing...\n");
+    goldie::assert!("testing...\n");
 }
 
 #[test]
 fn goldie_assert_alt() {
     let err: io::Result<()> = Err(io::Error::other("failed to frobnicate"));
     let err = err.context("while shaving the yak");
-    crate::assert_alt!(err.unwrap_err());
+    goldie::assert_alt!(err.unwrap_err());
 }
 
 #[allow(dead_code)]
@@ -127,7 +183,7 @@ fn goldie_assert_debug() {
         name: "Steve",
         surname: "Harrington",
     };
-    crate::assert_debug!(&u);
+    goldie::assert_debug!(&u);
 }
 
 #[test]
@@ -136,7 +192,7 @@ fn goldie_assert_debug_alt() {
         name: "Steve",
         surname: "Harrington",
     };
-    crate::assert_debug_alt!(&u);
+    goldie::assert_debug_alt!(&u);
 }
 
 #[test]
@@ -146,7 +202,7 @@ fn goldie_assert_template() {
         test: &'static str,
     }
     let ctx = Context { test: "testing..." };
-    crate::assert_template!(&ctx, "Such testing...\n");
+    goldie::assert_template!(&ctx, "Such testing...\n");
 }
 
 #[test]
@@ -156,5 +212,5 @@ fn goldie_assert_json() {
         surname: "Harrington",
     };
 
-    crate::assert_json!(&u);
+    goldie::assert_json!(&u);
 }

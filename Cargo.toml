@@ -10,14 +10,17 @@ repository = "https://github.com/rossmacarthur/goldie"
 license = "MIT OR Apache-2.0"
 keywords = ["golden", "file", "testing", "tool"]
 categories = ["development-tools::testing"]
+include = ["src/lib.rs", "LICENSE-*", "README.md"]
 
 [dependencies]
-anyhow = "1.0.55"
 pretty_assertions = { version = "1.4.1", optional = true }
 serde = { version = "1.0.136", features = ["derive"], optional = true }
 serde_json = { version = "1.0.79", optional = true }
 upon = { version = "0.10.0", features = ["syntax"], optional = true }
 yansi = { version = "1.0.1", optional = true }
+
+[dev-dependencies]
+anyhow = "1.0.55"
 
 [features]
 default = ["color", "json", "template"]

@@ -39,7 +39,7 @@
 //!
 //! ```rust,no_run
 //! # let text = "";
-//! goldie::builder!()
+//! goldie::new!()
 //!     .name("custom_name")
 //!     .build()
 //!     .assert(text);
@@ -119,15 +119,11 @@
 //! }
 //! ```
 
-#[cfg(test)]
-mod tests;
-
 use std::env;
 use std::fmt;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
-use anyhow::Context as _;
 #[cfg(feature = "color")]
 use pretty_assertions::assert_eq;
 #[cfg(any(feature = "template", feature = "json"))]
@@ -137,7 +133,7 @@ use serde::Serialize;
 #[macro_export]
 macro_rules! assert {
     ($actual:expr) => {
-        $crate::builder!().build().assert($actual);
+        $crate::new!().build().assert($actual);
     };
 }
 
@@ -145,7 +141,7 @@ macro_rules! assert {
 #[macro_export]
 macro_rules! assert_alt {
     ($actual:expr) => {
-        $crate::builder!().build().assert_alt($actual);
+        $crate::new!().build().assert_alt($actual);
     };
 }
 
@@ -153,7 +149,7 @@ macro_rules! assert_alt {
 #[macro_export]
 macro_rules! assert_debug {
     ($actual:expr) => {
-        $crate::builder!().build().assert_debug($actual);
+        $crate::new!().build().assert_debug($actual);
     };
 }
 
@@ -161,7 +157,7 @@ macro_rules! assert_debug {
 #[macro_export]
 macro_rules! assert_debug_alt {
     ($actual:expr) => {
-        $crate::builder!().build().assert_debug_alt($actual);
+        $crate::new!().build().assert_debug_alt($actual);
     };
 }
 
@@ -169,7 +165,7 @@ macro_rules! assert_debug_alt {
 #[macro_export]
 macro_rules! assert_template {
     ($ctx:expr, $actual:expr) => {
-        $crate::builder!().build().assert_template($ctx, $actual);
+        $crate::new!().build().assert_template($ctx, $actual);
     };
 }
 
@@ -177,14 +173,14 @@ macro_rules! assert_template {
 #[macro_export]
 macro_rules! assert_json {
     ($actual:expr) => {
-        $crate::builder!().build().assert_json($actual);
+        $crate::new!().build().assert_json($actual);
     };
 }
 
 /// Constructs a new goldie instance.
 #[doc(hidden)]
 #[macro_export]
-macro_rules! builder {
+macro_rules! new {
     () => {{
         let source_manifest_dir = ::std::env!("CARGO_MANIFEST_DIR");
         let source_file = ::std::file!();
@@ -249,9 +245,9 @@ pub struct Builder {
 #[derive(Debug)]
 pub struct Goldie {
     /// The path to the golden file.
-    golden_file: PathBuf,
+    pub golden_file: PathBuf,
     /// Whether to update the golden file if it doesn't match.
-    update: bool,
+    pub update: bool,
 }
 
 impl Builder {
@@ -436,9 +432,12 @@ impl Goldie {
             fs::create_dir_all(dir).expect("create golden dir");
             fs::write(&self.golden_file, &value).expect("write golden file");
         } else {
-            let expected = fs::read_to_string(&self.golden_file)
-                .with_context(|| self.error("failed to read golden file"))
-                .unwrap();
+            let expected = match fs::read_to_string(&self.golden_file) {
+                Ok(c) => c,
+                Err(err) => {
+                    panic!("{}", self.error("failed to read golden file", &err));
+                }
+            };
             assert_eq!(
                 value,
                 expected,
@@ -489,15 +488,13 @@ impl Goldie {
             upon::Engine::with_syntax(upon::Syntax::builder().expr("{{", "}}").build())
         });
 
-        let contents = fs::read_to_string(&self.golden_file)
-            .with_context(|| self.error("failed to read golden file"))
-            .unwrap();
+        let contents = fs::read_to_string(&self.golden_file).expect("failed to read golden file");
         let expected = ENGINE
             .compile(&contents)
-            .expect("compile golden file template")
+            .expect("failed to compile golden file template")
             .render(&ENGINE, &ctx)
             .to_string()
-            .expect("render golden file template");
+            .expect("failed to render golden file template");
 
         assert_eq!(
             actual.as_ref(),
@@ -519,14 +516,21 @@ impl Goldie {
             )
             .expect("write golden file");
         } else {
-            let contents = fs::read_to_string(&self.golden_file)
-                .with_context(|| self.error("failed to read golden file"))
-                .unwrap();
-            let expected: serde_json::Value = serde_json::from_str(&contents)
-                .with_context(|| self.error("failed to parse golden file as JSON"))
-                .unwrap();
+            let contents = match fs::read_to_string(&self.golden_file) {
+                Ok(c) => c,
+                Err(err) => {
+                    panic!("{}", self.error("failed to read golden file", &err));
+                }
+            };
+            let expected: serde_json::Value = match serde_json::from_str(&contents) {
+                Ok(v) => v,
+                Err(err) => panic!(
+                    "{}",
+                    self.error("failed to parse golden file as JSON", &err)
+                ),
+            };
             let actual: serde_json::Value =
-                serde_json::to_value(&actual).expect("serialize actual value to JSON");
+                serde_json::to_value(&actual).expect("failed to serialize actual value to JSON");
 
             assert_eq!(
                 actual,
@@ -549,10 +553,10 @@ impl Goldie {
     }
 
     #[cfg(feature = "color")]
-    fn error(&self, msg: &str) -> String {
+    fn error(&self, msg: &str, err: &dyn std::error::Error) -> String {
         use yansi::Paint;
         format!(
-            "\n\n{}: {}\nrun with {} to regenerate the golden file\n\n",
+            "{}: {}\nCaused by: {err}\n💡 run with {} to regenerate the golden file\n\n",
             msg.red(),
             self.golden_file(),
             "GOLDIE_UPDATE=1".blue().bold(),
@@ -560,9 +564,9 @@ impl Goldie {
     }
 
     #[cfg(not(feature = "color"))]
-    fn error(&self, msg: &str) -> String {
+    fn error(&self, msg: &str, err: &dyn std::error::Error) -> String {
         format!(
-            "\n\n{}: {}\nrun with GOLDIE_UPDATE=1 to regenerate the golden file\n\n",
+            "{}: {}\nCaused by: {err}\nrun with GOLDIE_UPDATE=1 to regenerate the golden file\n\n",
             msg,
             self.golden_file(),
         )

@@ -39,35 +39,50 @@ fn example() {
 
 ## Usage
 
-### `assert!`
+#### Golden file location
+
+By default golden files are stored in a `testdata` directory next to the
+source test module. For example if your test is in `src/a/tests.rs` then
+the golden files will be stored in `src/a/testdata/`. This is configurable
+by using the `Builder`. For example:
+
+```rust,no_run
+# let text = "";
+goldie::new!()
+    .name("custom_name")
+    .build()
+    .assert(text);
+```
+
+#### `assert!`
 
 Compares the provided value with the contents of a golden file. The value
 must implement `Display`. If they do not match the test will fail. If the
 environment variable `GOLDIE_UPDATE=1` is set then the golden file will be
 updated.
 
-### `assert_alt!`
+#### `assert_alt!`
 
 Compares the provided value with the contents of a golden file. The value
 must implement `Display`. The alternate formatting (`{:#}`) is used. If they
 do not match the test will fail. If the environment variable
 `GOLDIE_UPDATE=1` is set then the golden file will be updated.
 
-### `assert_debug!`
+#### `assert_debug!`
 
 Compares the provided value with the contents of a golden file. The value
 must implement `Debug`. If they do not match the test will fail. If the
 environment variable `GOLDIE_UPDATE=1` is set then the golden file will be
 updated.
 
-### `assert_debug_alt!`
+#### `assert_debug_alt!`
 
 Compares the provided value with the contents of a golden file. The value
 must implement `Debug`. The alternate formatting (`{:#?}`) is used. If they
 do not match the test will fail. If the environment variable
 `GOLDIE_UPDATE=1` is set then the golden file will be updated.
 
-### `assert_json!`
+#### `assert_json!`
 
 Golden files containing JSON data are supported using
 `goldie::assert_json!`. Something implementing `serde::Serialize` needs to
