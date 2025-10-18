@@ -1,5 +1,7 @@
+use std::io;
 use std::path::Path;
 
+use anyhow::Context as _;
 use serde::Serialize;
 
 use crate::Builder;
@@ -106,20 +108,35 @@ fn goldie_assert() {
 }
 
 #[test]
-fn goldie_assert_debug() {
-    #[allow(dead_code)]
-    #[derive(Debug)]
-    struct User {
-        name: &'static str,
-        surname: &'static str,
-    }
+fn goldie_assert_alt() {
+    let err: io::Result<()> = Err(io::Error::other("failed to frobnicate"));
+    let err = err.context("while shaving the yak");
+    crate::assert_alt!(err.unwrap_err());
+}
 
+#[allow(dead_code)]
+#[derive(Debug, Serialize)]
+struct User {
+    name: &'static str,
+    surname: &'static str,
+}
+
+#[test]
+fn goldie_assert_debug() {
     let u = User {
         name: "Steve",
         surname: "Harrington",
     };
-
     crate::assert_debug!(&u);
+}
+
+#[test]
+fn goldie_assert_debug_alt() {
+    let u = User {
+        name: "Steve",
+        surname: "Harrington",
+    };
+    crate::assert_debug_alt!(&u);
 }
 
 #[test]
@@ -134,12 +151,6 @@ fn goldie_assert_template() {
 
 #[test]
 fn goldie_assert_json() {
-    #[derive(Serialize)]
-    struct User {
-        name: &'static str,
-        surname: &'static str,
-    }
-
     let u = User {
         name: "Steve",
         surname: "Harrington",

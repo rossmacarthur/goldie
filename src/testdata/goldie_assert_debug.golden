@@ -1,4 +1,1 @@
-User {
-    name: "Steve",
-    surname: "Harrington",
-}
+User { name: "Steve", surname: "Harrington" }
