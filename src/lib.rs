@@ -30,35 +30,50 @@
 //!
 //! # Usage
 //!
-//! ## [`assert!`]
+//! ### Golden file location
+//!
+//! By default golden files are stored in a `testdata` directory next to the
+//! source test module. For example if your test is in `src/a/tests.rs` then
+//! the golden files will be stored in `src/a/testdata/`. This is configurable
+//! by using the [`Builder`]. For example:
+//!
+//! ```rust,no_run
+//! # let text = "";
+//! goldie::builder!()
+//!     .name("custom_name")
+//!     .build()
+//!     .assert(text);
+//! ```
+//!
+//! ### [`assert!`]
 //!
 //! Compares the provided value with the contents of a golden file. The value
 //! must implement `Display`. If they do not match the test will fail. If the
 //! environment variable `GOLDIE_UPDATE=1` is set then the golden file will be
 //! updated.
 //!
-//! ## [`assert_alt!`]
+//! ### [`assert_alt!`]
 //!
 //! Compares the provided value with the contents of a golden file. The value
 //! must implement `Display`. The alternate formatting (`{:#}`) is used. If they
 //! do not match the test will fail. If the environment variable
 //! `GOLDIE_UPDATE=1` is set then the golden file will be updated.
 //!
-//! ## [`assert_debug!`]
+//! ### [`assert_debug!`]
 //!
 //! Compares the provided value with the contents of a golden file. The value
 //! must implement `Debug`. If they do not match the test will fail. If the
 //! environment variable `GOLDIE_UPDATE=1` is set then the golden file will be
 //! updated.
 //!
-//! ## [`assert_debug_alt!`]
+//! ### [`assert_debug_alt!`]
 //!
 //! Compares the provided value with the contents of a golden file. The value
 //! must implement `Debug`. The alternate formatting (`{:#?}`) is used. If they
 //! do not match the test will fail. If the environment variable
 //! `GOLDIE_UPDATE=1` is set then the golden file will be updated.
 //!
-//! ## [`assert_json!`]
+//! ### [`assert_json!`]
 //!
 //! Golden files containing JSON data are supported using
 //! `goldie::assert_json!`. Something implementing `serde::Serialize` needs to
@@ -112,77 +127,58 @@ use std::fmt;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
+use anyhow::Context as _;
 #[cfg(feature = "color")]
 use pretty_assertions::assert_eq;
-
-use anyhow::{Context, Result};
 #[cfg(any(feature = "template", feature = "json"))]
 use serde::Serialize;
 
 /// Assert the golden file matches the display output `"{}"`
 #[macro_export]
 macro_rules! assert {
-    ($actual:expr) => {{
-        let g = $crate::builder!().build();
-        if let Err(err) = g.assert($actual) {
-            ::std::panic!("{}", err);
-        }
-    }};
+    ($actual:expr) => {
+        $crate::builder!().build().assert($actual);
+    };
 }
 
 /// Assert the golden file matches the alternate display output `"{:#}"`.
 #[macro_export]
 macro_rules! assert_alt {
-    ($actual:expr) => {{
-        let g = $crate::builder!().build();
-        if let Err(err) = g.assert_alt($actual) {
-            ::std::panic!("{}", err);
-        }
-    }};
+    ($actual:expr) => {
+        $crate::builder!().build().assert_alt($actual);
+    };
 }
 
 /// Assert the golden file matches the debug output `"{:?}"`
 #[macro_export]
 macro_rules! assert_debug {
-    ($actual:expr) => {{
-        let g = $crate::builder!().build();
-        if let Err(err) = g.assert_debug($actual) {
-            ::std::panic!("{}", err);
-        }
-    }};
+    ($actual:expr) => {
+        $crate::builder!().build().assert_debug($actual);
+    };
 }
 
 /// Assert the golden file matches the alternate debug output `"{:#?}"`.
 #[macro_export]
 macro_rules! assert_debug_alt {
-    ($actual:expr) => {{
-        let g = $crate::builder!().build();
-        if let Err(err) = g.assert_debug_alt($actual) {
-            ::std::panic!("{}", err);
-        }
-    }};
+    ($actual:expr) => {
+        $crate::builder!().build().assert_debug_alt($actual);
+    };
 }
 
 /// Assert the templated golden file matches.
 #[macro_export]
 macro_rules! assert_template {
-    ($ctx:expr, $actual:expr) => {{
-        let g = $crate::builder!().build();
-        if let Err(err) = g.assert_template($ctx, $actual) {
-            ::std::panic!("{}", err);
-        }
-    }};
+    ($ctx:expr, $actual:expr) => {
+        $crate::builder!().build().assert_template($ctx, $actual);
+    };
 }
 
 /// Assert the JSON golden file matches.
 #[macro_export]
 macro_rules! assert_json {
-    ($actual:expr) => {{
-        let g = $crate::builder!().build();
-        if let Err(err) = g.assert_json($actual) {
-            ::std::panic!("{}", err);
-        }
-    }};
+    ($actual:expr) => {
+        $crate::builder!().build().assert_json($actual);
+    };
 }
 
 /// Constructs a new goldie instance.
@@ -249,6 +245,7 @@ pub struct Builder {
     update: Option<bool>,
 }
 
+/// Configuration for a golden file assertion
 #[derive(Debug)]
 pub struct Goldie {
     /// The path to the golden file.
@@ -432,15 +429,16 @@ fn match_paths(left: &Path, right: &Path) -> (PathBuf, PathBuf, PathBuf) {
 
 impl Goldie {
     #[track_caller]
-    pub fn assert(&self, actual: impl fmt::Display) -> Result<()> {
+    pub fn assert(&self, actual: impl fmt::Display) {
         let value = format!("{actual}");
         if self.update {
             let dir = self.golden_file.parent().unwrap();
-            fs::create_dir_all(dir)?;
-            fs::write(&self.golden_file, &value)?;
+            fs::create_dir_all(dir).expect("create golden dir");
+            fs::write(&self.golden_file, &value).expect("write golden file");
         } else {
             let expected = fs::read_to_string(&self.golden_file)
-                .with_context(|| self.error("failed to read golden file"))?;
+                .with_context(|| self.error("failed to read golden file"))
+                .unwrap();
             assert_eq!(
                 value,
                 expected,
@@ -448,11 +446,10 @@ impl Goldie {
                 self.golden_file()
             );
         }
-        Ok(())
     }
 
     #[track_caller]
-    pub fn assert_alt(&self, actual: impl fmt::Display) -> Result<()> {
+    pub fn assert_alt(&self, actual: impl fmt::Display) {
         struct Wrapper<T>(T);
         impl<T: fmt::Display> fmt::Display for Wrapper<T> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -463,7 +460,7 @@ impl Goldie {
     }
 
     #[track_caller]
-    pub fn assert_debug(&self, actual: impl fmt::Debug) -> Result<()> {
+    pub fn assert_debug(&self, actual: impl fmt::Debug) {
         struct Wrapper<T>(T);
         impl<T: fmt::Debug> fmt::Display for Wrapper<T> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -474,7 +471,7 @@ impl Goldie {
     }
 
     #[track_caller]
-    pub fn assert_debug_alt(&self, actual: impl fmt::Debug) -> Result<()> {
+    pub fn assert_debug_alt(&self, actual: impl fmt::Debug) {
         struct Wrapper<T>(T);
         impl<T: fmt::Debug> fmt::Display for Wrapper<T> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -486,20 +483,21 @@ impl Goldie {
 
     #[cfg(feature = "template")]
     #[track_caller]
-    pub fn assert_template(&self, ctx: impl Serialize, actual: impl AsRef<str>) -> Result<()> {
+    pub fn assert_template(&self, ctx: impl Serialize, actual: impl AsRef<str>) {
         use std::sync::LazyLock as Lazy;
         static ENGINE: Lazy<upon::Engine> = Lazy::new(|| {
             upon::Engine::with_syntax(upon::Syntax::builder().expr("{{", "}}").build())
         });
 
         let contents = fs::read_to_string(&self.golden_file)
-            .with_context(|| self.error("failed to read golden file"))?;
+            .with_context(|| self.error("failed to read golden file"))
+            .unwrap();
         let expected = ENGINE
             .compile(&contents)
-            .with_context(|| self.error("failed to compile golden file template"))?
+            .expect("compile golden file template")
             .render(&ENGINE, &ctx)
             .to_string()
-            .with_context(|| self.error("failed to render golden file template"))?;
+            .expect("render golden file template");
 
         assert_eq!(
             actual.as_ref(),
@@ -507,26 +505,28 @@ impl Goldie {
             "\n\ngolden file `{}` does not match",
             self.golden_file()
         );
-
-        Ok(())
     }
 
     #[cfg(feature = "json")]
     #[track_caller]
-    pub fn assert_json(&self, actual: impl Serialize) -> Result<()> {
+    pub fn assert_json(&self, actual: impl Serialize) {
         if self.update {
             let dir = self.golden_file.parent().unwrap();
-            fs::create_dir_all(dir)?;
+            fs::create_dir_all(dir).expect("create golden dir");
             fs::write(
                 &self.golden_file,
                 serde_json::to_string_pretty(&actual).unwrap(),
-            )?;
+            )
+            .expect("write golden file");
         } else {
             let contents = fs::read_to_string(&self.golden_file)
-                .with_context(|| self.error("failed to read golden file"))?;
-            let expected: serde_json::Value =
-                serde_json::from_str(&contents).with_context(|| self.error("bad JSON"))?;
-            let actual: serde_json::Value = serde_json::to_value(&actual)?;
+                .with_context(|| self.error("failed to read golden file"))
+                .unwrap();
+            let expected: serde_json::Value = serde_json::from_str(&contents)
+                .with_context(|| self.error("failed to parse golden file as JSON"))
+                .unwrap();
+            let actual: serde_json::Value =
+                serde_json::to_value(&actual).expect("serialize actual value to JSON");
 
             assert_eq!(
                 actual,
@@ -535,8 +535,6 @@ impl Goldie {
                 self.golden_file(),
             );
         }
-
-        Ok(())
     }
 
     fn golden_file(&self) -> impl fmt::Display + '_ {
