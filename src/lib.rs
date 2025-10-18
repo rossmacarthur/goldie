@@ -53,9 +53,9 @@ mod tests;
 use std::env;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
+use std::sync::LazyLock as Lazy;
 
 use anyhow::{Context, Result};
-use once_cell::sync::Lazy;
 use serde::Serialize;
 
 /// Assert the golden file matches.
@@ -377,7 +377,7 @@ impl Goldie {
     #[track_caller]
     pub fn assert_template(&self, ctx: impl Serialize, actual: impl AsRef<str>) -> Result<()> {
         static ENGINE: Lazy<upon::Engine> = Lazy::new(|| {
-            upon::Engine::with_syntax(upon::SyntaxBuilder::new().expr("{{", "}}").build())
+            upon::Engine::with_syntax(upon::Syntax::builder().expr("{{", "}}").build())
         });
 
         let contents = fs::read_to_string(&self.golden_file)
