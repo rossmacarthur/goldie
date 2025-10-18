@@ -14,7 +14,7 @@ jobs:
         toolchain: [stable, beta, nightly]
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - uses: dtolnay/rust-toolchain@master
       with:
@@ -25,10 +25,17 @@ jobs:
       run: cargo fmt -- --check
 
     - name: Clippy
-      run: cargo clippy --workspace
+      run: cargo clippy --workspace --all-features --all-targets
 
     - name: Test
-      run: cargo test --workspace
+      run: cargo test --workspace --all-features
+
+    - uses: extractions/setup-crate@v1
+      with:
+        repo: taiki-e/cargo-hack
+
+    - name: Check feature powerset
+      run: cargo hack check --feature-powerset
 
   check-version:
     needs: build
@@ -37,7 +44,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Calculate version from tag
         id: version
@@ -51,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - uses: dtolnay/rust-toolchain@stable
 
     - name: Publish

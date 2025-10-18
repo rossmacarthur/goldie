@@ -1,6 +1,8 @@
-use super::*;
+use std::path::Path;
 
 use serde::Serialize;
+
+use crate::Builder;
 
 #[test]
 fn goldie_golden_file() {

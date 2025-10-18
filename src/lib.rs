@@ -51,11 +51,15 @@
 mod tests;
 
 use std::env;
+use std::fmt::Display;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
-use std::sync::LazyLock as Lazy;
+
+#[cfg(feature = "color")]
+use pretty_assertions::assert_eq;
 
 use anyhow::{Context, Result};
+#[cfg(any(feature = "template", feature = "json"))]
 use serde::Serialize;
 
 /// Assert the golden file matches.
@@ -357,13 +361,11 @@ impl Goldie {
         } else {
             let expected = fs::read_to_string(&self.golden_file)
                 .with_context(|| self.error("failed to read golden file"))?;
-            pretty_assertions::assert_eq!(
+            assert_eq!(
                 actual.as_ref(),
                 expected,
                 "\n\ngolden file `{}` does not match",
-                self.golden_file
-                    .strip_prefix(env::current_dir()?)?
-                    .display(),
+                self.golden_file()
             );
         }
         Ok(())
@@ -374,8 +376,10 @@ impl Goldie {
         self.assert(format!("{actual:#?}"))
     }
 
+    #[cfg(feature = "template")]
     #[track_caller]
     pub fn assert_template(&self, ctx: impl Serialize, actual: impl AsRef<str>) -> Result<()> {
+        use std::sync::LazyLock as Lazy;
         static ENGINE: Lazy<upon::Engine> = Lazy::new(|| {
             upon::Engine::with_syntax(upon::Syntax::builder().expr("{{", "}}").build())
         });
@@ -389,18 +393,17 @@ impl Goldie {
             .to_string()
             .with_context(|| self.error("failed to render golden file template"))?;
 
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             actual.as_ref(),
             expected,
             "\n\ngolden file `{}` does not match",
-            self.golden_file
-                .strip_prefix(env::current_dir()?)?
-                .display(),
+            self.golden_file()
         );
 
         Ok(())
     }
 
+    #[cfg(feature = "json")]
     #[track_caller]
     pub fn assert_json(&self, actual: impl Serialize) -> Result<()> {
         if self.update {
@@ -417,26 +420,45 @@ impl Goldie {
                 serde_json::from_str(&contents).with_context(|| self.error("bad JSON"))?;
             let actual: serde_json::Value = serde_json::to_value(&actual)?;
 
-            pretty_assertions::assert_eq!(
+            assert_eq!(
                 actual,
                 expected,
                 "\n\ngolden file `{}` does not match",
-                self.golden_file
-                    .strip_prefix(env::current_dir()?)?
-                    .display(),
+                self.golden_file(),
             );
         }
 
         Ok(())
     }
 
+    fn golden_file(&self) -> impl Display + '_ {
+        let path = match env::current_dir() {
+            Ok(cwd) => self
+                .golden_file
+                .strip_prefix(cwd)
+                .unwrap_or(&self.golden_file),
+            Err(_) => &self.golden_file,
+        };
+        path.display()
+    }
+
+    #[cfg(feature = "color")]
     fn error(&self, msg: &str) -> String {
         use yansi::Paint;
         format!(
             "\n\n{}: {}\nrun with {} to regenerate the golden file\n\n",
             msg.red(),
-            self.golden_file.display(),
+            self.golden_file(),
             "GOLDIE_UPDATE=1".blue().bold(),
+        )
+    }
+
+    #[cfg(not(feature = "color"))]
+    fn error(&self, msg: &str) -> String {
+        format!(
+            "\n\n{}: {}\nrun with GOLDIE_UPDATE=1 to regenerate the golden file\n\n",
+            msg,
+            self.golden_file(),
         )
     }
 }
