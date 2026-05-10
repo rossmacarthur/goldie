@@ -119,13 +119,22 @@
 //! }
 //! ```
 
+use std::collections::BTreeMap;
 use std::env;
+use std::ffi::OsStr;
 use std::fmt;
 use std::fs;
-use std::path::{Component, Path, PathBuf};
+use std::path::Component;
+use std::path::Path;
+use std::path::PathBuf;
+use std::process;
+use std::sync::Arc;
+use std::sync::LazyLock as Lazy;
+use std::sync::Mutex;
 
 #[cfg(feature = "color")]
 use pretty_assertions::assert_eq;
+use serde::Deserialize;
 #[cfg(any(feature = "template", feature = "json"))]
 use serde::Serialize;
 
@@ -214,10 +223,10 @@ macro_rules! function_path {
 #[derive(Debug, Clone)]
 pub struct Builder {
     /// env!("CARGO_MANIFEST_DIR") in the test
-    source_manifest_dir: PathBuf,
+    source_manifest_dir: &'static str,
 
     /// file!() in the test, e.g. src/module/tests/file.rs
-    source_file: PathBuf,
+    source_file: &'static str,
 
     /// _function_path!() in the test, e.g. crate::module::tests::function_name
     function_path: PathBuf,
@@ -258,8 +267,8 @@ impl Builder {
         function_path: &'static str,
     ) -> Self {
         Self {
-            source_manifest_dir: PathBuf::from(source_manifest_dir),
-            source_file: PathBuf::from(source_file),
+            source_manifest_dir,
+            source_file,
             function_path: function_path.split("::").collect(),
             name: None,
             name_prefix: None,
@@ -353,9 +362,12 @@ impl Builder {
 
         let skip_mod = |c: &Component| c.as_os_str() != "lib" && c.as_os_str() != "mod";
         let skip_tests = |c: &Component| c.as_os_str() != "tests";
+        let workspace_dir = cargo_workspace_package_dir(source_manifest_dir);
 
         // Convert a source file path like "src/a/mod.rs" into "src/a"
-        let source_file: PathBuf = source_file
+        let source_file: PathBuf = Path::new(source_file)
+            .strip_prefix(workspace_dir)
+            .unwrap_or(Path::new(source_file))
             .with_extension("")
             .components()
             .filter(skip_mod)
@@ -371,7 +383,7 @@ impl Builder {
             match_paths(&source_file, &function_path);
 
         let golden_dir = golden_dir.unwrap_or_else(|| {
-            let mut d = source_manifest_dir.clone();
+            let mut d = PathBuf::from(source_manifest_dir);
             d.push(source_file);
             d.extend(remaining_mods.components().filter(skip_tests));
             d.push("testdata");
@@ -571,4 +583,58 @@ impl Goldie {
             self.golden_file(),
         )
     }
+}
+
+/// Not public API.
+///
+/// Returns the package manifest dir relative to the Cargo workspace root.
+///
+/// Cargo may report `file!()` paths relative to the workspace root for
+/// workspace members, e.g. `bar/src/lib.rs` instead of `src/lib.rs`. This
+/// value is used to strip that package prefix before computing the golden file
+/// path.
+///
+/// Not public API.
+#[doc(hidden)]
+pub fn cargo_workspace_package_dir(manifest_dir: &str) -> Arc<Path> {
+    static DIRS: Lazy<Mutex<BTreeMap<String, Arc<Path>>>> =
+        Lazy::new(|| Mutex::new(BTreeMap::new()));
+
+    let mut dirs = DIRS.lock().unwrap();
+
+    if let Some(dir) = dirs.get(manifest_dir) {
+        return dir.clone();
+    }
+
+    let dir = env::var("CARGO_WORKSPACE_DIR")
+        .map(|dir| {
+            Path::new(manifest_dir)
+                .strip_prefix(dir)
+                .unwrap_or(Path::new(manifest_dir))
+                .to_path_buf()
+        })
+        .unwrap_or_else(|_| {
+            #[derive(Deserialize)]
+            struct Manifest {
+                workspace_root: PathBuf,
+            }
+            let cargo = env::var_os("CARGO");
+            let cargo = cargo.as_deref().unwrap_or_else(|| OsStr::new("cargo"));
+            let output = process::Command::new(cargo)
+                .args(["metadata", "--format-version=1", "--no-deps"])
+                .current_dir(manifest_dir)
+                .output()
+                .expect("failed to run `cargo metadata`");
+            core::assert!(output.status.success(), "failed to fetch `cargo metadata`");
+            let manifest: Manifest = serde_json::from_slice(&output.stdout).unwrap();
+            PathBuf::from(manifest_dir)
+                .strip_prefix(&manifest.workspace_root)
+                .unwrap_or(Path::new(manifest_dir))
+                .to_path_buf()
+        });
+
+    let dir: Arc<Path> = dir.into_boxed_path().into();
+    dirs.insert(String::from(manifest_dir), dir.clone());
+
+    dir
 }
