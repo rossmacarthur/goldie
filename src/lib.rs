@@ -141,7 +141,7 @@ use serde::Serialize;
 /// Assert the golden file matches the display output `"{}"`
 #[macro_export]
 macro_rules! assert {
-    ($actual:expr) => {
+    ($actual:expr $(,)?) => {
         $crate::new!().build().assert($actual);
     };
 }
@@ -149,7 +149,7 @@ macro_rules! assert {
 /// Assert the golden file matches the alternate display output `"{:#}"`.
 #[macro_export]
 macro_rules! assert_alt {
-    ($actual:expr) => {
+    ($actual:expr $(,)?) => {
         $crate::new!().build().assert_alt($actual);
     };
 }
@@ -157,7 +157,7 @@ macro_rules! assert_alt {
 /// Assert the golden file matches the debug output `"{:?}"`
 #[macro_export]
 macro_rules! assert_debug {
-    ($actual:expr) => {
+    ($actual:expr $(,)?) => {
         $crate::new!().build().assert_debug($actual);
     };
 }
@@ -165,7 +165,7 @@ macro_rules! assert_debug {
 /// Assert the golden file matches the alternate debug output `"{:#?}"`.
 #[macro_export]
 macro_rules! assert_debug_alt {
-    ($actual:expr) => {
+    ($actual:expr $(,)?) => {
         $crate::new!().build().assert_debug_alt($actual);
     };
 }
@@ -173,7 +173,7 @@ macro_rules! assert_debug_alt {
 /// Assert the templated golden file matches.
 #[macro_export]
 macro_rules! assert_template {
-    ($ctx:expr, $actual:expr) => {
+    ($ctx:expr, $actual:expr $(,)?) => {
         $crate::new!().build().assert_template($ctx, $actual);
     };
 }
@@ -181,7 +181,7 @@ macro_rules! assert_template {
 /// Assert the JSON golden file matches.
 #[macro_export]
 macro_rules! assert_json {
-    ($actual:expr) => {
+    ($actual:expr $(,)?) => {
         $crate::new!().build().assert_json($actual);
     };
 }
